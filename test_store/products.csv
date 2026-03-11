@@ -1,16 +1,35 @@
-Brand,Attribute_Type,Value,Price_Adjustment,Parent_Value
-H-DWB,Length,14,17.5,
-H-DWB,Length,18,25,
-H-DWB,Length,22,39.5,
-H-DWB,Color,1,0,"""14, 18, 22"""
-H-DWB,Color,1B,0,"""14, 18, 22"""
-H-DWB,Color,2,0,"""14, 18, 22"""
-H-DWB,Color,27,3,"""14, 18, 22"""
-H-DWB,Color,30,3,"""14, 18, 22"""
-H-DWB,Color,350,3,"""14, 18"""
-H-DWB,Color,4,0,"""14, 18, 22"""
-H-DWB,Color,613,15,"""14, 18"""
-H-DWB,Color,F1B/27,3,"""14, 18, 22"""
-H-DWB,Color,F1B/30,3,"""14, 18, 22"""
-H-DWB,Color,F4/27,3,"""14, 18, 22"""
-H-DWB,Color,F4/30,3,"""14, 18, 22"""
+Brand_Name,Series,Description,Length,Color,Price
+Cleopatra,H-DWB,French Deep Wave Bulk,14,1,17.5
+Cleopatra,H-DWB,French Deep Wave Bulk,14,1B,17.5
+Cleopatra,H-DWB,French Deep Wave Bulk,14,2,17.5
+Cleopatra,H-DWB,French Deep Wave Bulk,14,27,20
+Cleopatra,H-DWB,French Deep Wave Bulk,14,30,20
+Cleopatra,H-DWB,French Deep Wave Bulk,14,350,20
+Cleopatra,H-DWB,French Deep Wave Bulk,14,4,17.5
+Cleopatra,H-DWB,French Deep Wave Bulk,14,613,25
+Cleopatra,H-DWB,French Deep Wave Bulk,14,F1B/27,20
+Cleopatra,H-DWB,French Deep Wave Bulk,14,F1B/30,20
+Cleopatra,H-DWB,French Deep Wave Bulk,14,F4/27,20
+Cleopatra,H-DWB,French Deep Wave Bulk,14,F4/30,20
+Cleopatra,H-DWB,French Deep Wave Bulk,18,1,25
+Cleopatra,H-DWB,French Deep Wave Bulk,18,1B,25
+Cleopatra,H-DWB,French Deep Wave Bulk,18,2,25
+Cleopatra,H-DWB,French Deep Wave Bulk,18,27,28
+Cleopatra,H-DWB,French Deep Wave Bulk,18,30,28
+Cleopatra,H-DWB,French Deep Wave Bulk,18,350,28
+Cleopatra,H-DWB,French Deep Wave Bulk,18,4,40
+Cleopatra,H-DWB,French Deep Wave Bulk,18,613,15
+Cleopatra,H-DWB,French Deep Wave Bulk,18,F1B/27,28
+Cleopatra,H-DWB,French Deep Wave Bulk,18,F1B/30,28
+Cleopatra,H-DWB,French Deep Wave Bulk,18,F4/27,28
+Cleopatra,H-DWB,French Deep Wave Bulk,18,F4/30,28
+Cleopatra,H-DWB,French Deep Wave Bulk,22,1,39.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,1B,39.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,2,39.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,27,46.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,30,46.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,4,39.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,F1B/27,46.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,F1B/30,46.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,F4/27,46.5
+Cleopatra,H-DWB,French Deep Wave Bulk,22,F4/30,46.5

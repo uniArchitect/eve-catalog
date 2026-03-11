@@ -8,54 +8,102 @@ st.set_page_config(page_title="Eve Catalog", page_icon="🛍️", layout="wide")
 @st.cache_data
 def load_data(csv_path: str = "products.csv") -> pd.DataFrame:
     """Load raw pricing data from CSV."""
-    return pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path)
+    df = df.copy()
+
+    # Normalize expected columns for combo pricing with Brand/Series naming
+    df["Brand_Name"] = df["Brand_Name"].astype(str).str.strip()
+    df["Series"] = df["Series"].astype(str).str.strip()
+    df["Length"] = df["Length"].astype(str).str.strip()
+    df["Color"] = df["Color"].astype(str).str.strip()
+    if "Description" in df.columns:
+        df["Description"] = df["Description"].fillna("").astype(str).str.strip()
+    else:
+        df["Description"] = ""
+
+    if "Price" not in df.columns:
+        raise ValueError("CSV must contain a 'Price' column.")
+    df["Price"] = df["Price"].astype(float)
+
+    return df
 
 
 def build_brand_catalog(df: pd.DataFrame) -> dict:
     """
-    Transform the attribute-style CSV into a nested structure focused on lengths:
+    Transform the combo-style CSV into a nested structure:
     {
-        brand: {
-            "lengths": {value: price},
+        brand_name: {
+            "series": {
+                series: {
+                    "lengths": [length1, length2, ...],
+                    "colors_by_length": {
+                        length1: [color_a, color_b, ...],
+                        ...
+                    },
+                    "price_table": {
+                        (length, color): price,
+                        ...
+                    },
+                },
+                ...
+            },
         },
         ...
     }
     """
     catalog: dict[str, dict] = {}
 
-    # Normalize key columns
-    df = df.copy()
-    df["Brand"] = df["Brand"].astype(str)
-    df["Attribute_Type"] = df["Attribute_Type"].astype(str).str.strip().str.lower()
-    df["Value"] = df["Value"].astype(str).str.strip()
-    if "Parent_Value" in df.columns:
-        df["Parent_Value"] = df["Parent_Value"].fillna("").astype(str).str.strip()
+    for brand_name, brand_group in df.groupby("Brand_Name"):
+        series_dict: dict[str, dict] = {}
 
-    for brand, group in df.groupby("Brand"):
-        length_rows = group[group["Attribute_Type"] == "length"]
+        for series, series_group in brand_group.groupby("Series"):
+            lengths = sorted(series_group["Length"].unique(), key=str)
 
-        lengths = (
-            length_rows.set_index("Value")["Price_Adjustment"].astype(float).to_dict()
-            if not length_rows.empty
-            else {}
-        )
+            colors_by_length: dict[str, set[str]] = {}
+            price_table: dict[tuple[str, str], float] = {}
+            description_table: dict[tuple[str, str], str] = {}
 
-        catalog[brand] = {
-            "lengths": lengths,
+            for _, row in series_group.iterrows():
+                length = str(row["Length"])
+                color = str(row["Color"])
+                price = float(row["Price"])
+                description = str(row.get("Description", ""))
+
+                colors_by_length.setdefault(length, set()).add(color)
+                price_table[(length, color)] = price
+                description_table[(length, color)] = description
+
+            colors_by_length_lists = {
+                length: sorted(list(colors), key=str) for length, colors in colors_by_length.items()
+            }
+
+            series_dict[series] = {
+                "lengths": lengths,
+                "colors_by_length": colors_by_length_lists,
+                "price_table": price_table,
+                "description_table": description_table,
+            }
+
+        catalog[brand_name] = {
+            "series": series_dict,
         }
 
     return catalog
 
 
-def compute_unit_price(length_price: float, color_price: float) -> float:
-    """Final price is the sum of the selected length and color prices."""
-    return float(length_price) + float(color_price)
+def compute_unit_price(series_cfg: dict, length: str, color: str) -> float:
+    """Look up the price directly from the Series+Length+Color combo table."""
+    key = (str(length), str(color))
+    price_table = series_cfg.get("price_table", {})
+    if key not in price_table:
+        raise KeyError(f"No price configured for combination: {key}")
+    return float(price_table[key])
 
 
 # ---- Initialize data ----
 df = load_data()
 brand_catalog = build_brand_catalog(df)
-all_brands = sorted(brand_catalog.keys())
+all_brand_names = sorted(brand_catalog.keys())
 
 # ---- Initialize session state ----
 if "cart" not in st.session_state or not isinstance(st.session_state.cart, dict):
@@ -72,118 +120,124 @@ st.title("🛍️ Eve Catalog - Sales Order Configurator")
 # ---- Main Configurator Area ----
 st.subheader("Configure Your SKU")
 
-# Search/filter by brand
-search_query = st.text_input("Search by Brand", "").lower().strip()
+# Search/filter by Brand_Name
+search_query = st.text_input("Search by Brand Name", "").lower().strip()
 
 if search_query:
-    filtered_brands = [b for b in all_brands if search_query in b.lower()]
+    filtered_brands = [b for b in all_brand_names if search_query in b.lower()]
 else:
-    filtered_brands = all_brands
+    filtered_brands = all_brand_names
 
 if not filtered_brands:
     st.warning("No brands found matching that search.")
 else:
-    selected_brand = st.selectbox("Select Brand", filtered_brands)
+    selected_brand_name = st.selectbox("Select Brand", filtered_brands)
 
-    if selected_brand:
-        brand_cfg = brand_catalog[selected_brand]
+    if selected_brand_name:
+        brand_cfg = brand_catalog[selected_brand_name]
+        series_dict = brand_cfg.get("series", {})
+        series_options = sorted(series_dict.keys())
 
-        length_options = sorted(brand_cfg["lengths"].keys(), key=str)
-
-        if not length_options:
-            st.error("This brand does not have any Length configuration in the data.")
+        if not series_options:
+            st.error("This brand does not have any Series configuration in the data.")
         else:
-            col1, col2 = st.columns(2)
-            with col1:
-                selected_length = st.selectbox("Length", length_options)
+            selected_series = st.selectbox("Series", series_options)
 
-            # Filter colors based on Parent_Value mapping for the selected length
-            brand_rows = df[df["Brand"].astype(str) == selected_brand].copy()
-            brand_rows["Attribute_Type"] = (
-                brand_rows["Attribute_Type"].astype(str).str.strip().str.lower()
-            )
-            brand_rows["Value"] = brand_rows["Value"].astype(str).str.strip()
-            color_rows = brand_rows[brand_rows["Attribute_Type"] == "color"]
+            if selected_series:
+                series_cfg = series_dict[selected_series]
 
-            # Clean Parent_Value and apply flexible matching rules
-            if "Parent_Value" in color_rows.columns:
-                parent_clean = color_rows["Parent_Value"].fillna("").astype(str).str.strip()
-            else:
-                parent_clean = pd.Series([""] * len(color_rows), index=color_rows.index)
+                # Lengths available for the selected Brand_Name + Series
+                length_options = series_cfg["lengths"]
 
-            selected_length_str = str(selected_length)
-            # Colors with empty Parent_Value apply to all lengths;
-            # otherwise use a "contains" check to match entries like "18, 22"
-            mask_all_lengths = parent_clean == ""
-            mask_match_length = parent_clean.str.contains(selected_length_str)
-            valid_colors = color_rows[mask_all_lengths | mask_match_length]
-            colors_for_length = (
-                valid_colors.set_index("Value")["Price_Adjustment"].astype(float).to_dict()
-                if not valid_colors.empty
-                else {}
-            )
-            color_options = sorted(colors_for_length.keys(), key=str)
+                if not length_options:
+                    st.error("This series does not have any Length configuration in the data.")
+                else:
+                    # Display Brand_Name and Series clearly
+                    st.markdown(f"**Brand:** {selected_brand_name}  •  **Series:** {selected_series}")
 
-            if not color_options:
-                st.error(
-                    "No Color options are configured for this Length/Brand combination "
-                    "(check the Parent_Value mapping in the CSV)."
-                )
-            else:
-                with col2:
-                    selected_color = st.selectbox("Color", color_options)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        selected_length = st.selectbox("Length", length_options)
 
-                length_price = float(brand_cfg["lengths"].get(str(selected_length), 0.0))
-                color_price = float(colors_for_length.get(str(selected_color), 0.0))
-                unit_price = compute_unit_price(length_price, color_price)
+                    # Colors available for the selected Brand_Name + Series + Length
+                    colors_for_length = series_cfg["colors_by_length"].get(str(selected_length), [])
+                    color_options = colors_for_length
 
-                st.markdown(
-                    f"**Configured Price: ${unit_price:,.2f} per unit** "
-                    f"(Length: ${length_price:,.2f} + Color: ${color_price:,.2f})"
-                )
+                    if not color_options:
+                        st.error(
+                            "No Color options are configured for this Brand/Series/Length combination "
+                            "(missing Series+Length+Color row in the CSV)."
+                        )
+                    else:
+                        with col2:
+                            selected_color = st.selectbox("Color", color_options)
 
-                col3, col4 = st.columns(2)
-                with col3:
-                    line_discount = st.number_input(
-                        "Line-Item Discount (%)",
-                        min_value=0.0,
-                        max_value=100.0,
-                        value=0.0,
-                        step=1.0,
-                    )
-                with col4:
-                    qty = st.number_input(
-                        "Quantity",
-                        min_value=1,
-                        max_value=1000,
-                        value=1,
-                        step=1,
-                    )
+                        try:
+                            unit_price = compute_unit_price(series_cfg, selected_length, selected_color)
+                            description = series_cfg.get("description_table", {}).get(
+                                (str(selected_length), str(selected_color)), ""
+                            )
+                        except KeyError:
+                            st.error(
+                                "No price configured for this Brand/Series/Length/Color combination. "
+                                "Please check the CSV."
+                            )
+                            unit_price = 0.0
+                            description = ""
 
-                discounted_unit_price = unit_price * (1 - line_discount / 100.0)
-                st.markdown(
-                    f"Price after line discount: **${discounted_unit_price:,.2f} per unit** "
-                    f"({qty} units = ${discounted_unit_price * qty:,.2f})"
-                )
+                        if unit_price > 0:
+                            # SKU built from Series-Length-Color
+                            sku = f"{selected_series}-{selected_length}-{selected_color}"
 
-                sku = f"{selected_brand}-{selected_length}-{selected_color}"
-                if st.button("Add to Cart"):
-                    existing = st.session_state.cart.get(
-                        sku,
-                        {
-                            "qty": 0,
-                            "original_price": unit_price,
-                            "discount_percent": line_discount,
-                        },
-                    )
+                            st.markdown(
+                                f"**SKU:** `{sku}`  •  **Price:** ${unit_price:,.2f} per unit"
+                            )
+                            if description:
+                                st.caption(description)
 
-                    new_qty = existing["qty"] + qty
-                    st.session_state.cart[sku] = {
-                        "qty": new_qty,
-                        "original_price": unit_price,
-                        "discount_percent": line_discount,
-                    }
-                    st.toast(f"Added {qty}x {sku} to cart.")
+                            col3, col4 = st.columns(2)
+                            with col3:
+                                line_discount = st.number_input(
+                                    "Line-Item Discount (%)",
+                                    min_value=0.0,
+                                    max_value=100.0,
+                                    value=0.0,
+                                    step=1.0,
+                                )
+                            with col4:
+                                qty = st.number_input(
+                                    "Quantity",
+                                    min_value=1,
+                                    max_value=1000,
+                                    value=1,
+                                    step=1,
+                                )
+
+                            discounted_unit_price = unit_price * (1 - line_discount / 100.0)
+                            st.markdown(
+                                f"Price after line discount: **${discounted_unit_price:,.2f} per unit** "
+                                f"({qty} units = ${discounted_unit_price * qty:,.2f})"
+                            )
+
+                            if st.button("Add to Cart"):
+                                existing = st.session_state.cart.get(
+                                    sku,
+                                    {
+                                        "qty": 0,
+                                        "original_price": unit_price,
+                                        "discount_percent": line_discount,
+                                        "description": description,
+                                    },
+                                )
+
+                                new_qty = existing["qty"] + qty
+                                st.session_state.cart[sku] = {
+                                    "qty": new_qty,
+                                    "original_price": unit_price,
+                                    "discount_percent": line_discount,
+                                    "description": description or existing.get("description", ""),
+                                }
+                                st.toast(f"Added {qty}x {sku} to cart.")
 
 
 # ---- Sidebar: Cart, Discounts, Fees, Notes ----
@@ -200,6 +254,7 @@ with st.sidebar:
             qty = int(item.get("qty", 0))
             original_price = float(item.get("original_price", 0.0))
             discount_percent = float(item.get("discount_percent", 0.0))
+            description = item.get("description", "")
 
             if qty <= 0:
                 continue
@@ -212,6 +267,8 @@ with st.sidebar:
                 f"**{qty}x** {sku} @ ${original_price:,.2f} "
                 f"(-{discount_percent:.0f}%): ${line_price_after_discount:,.2f}"
             )
+            if description:
+                col_a.caption(description)
             if col_b.button("❌", key=f"remove_{sku}"):
                 del st.session_state.cart[sku]
                 st.rerun()
