@@ -1,5 +1,16 @@
-product,price
-espresso,3.5
-latte,4.25
-croissant,3.75
-avocado toast,8.5
+Brand,Attribute_Type,Value,Price_Adjustment,Parent_Value
+H-DWB,Length,14,17.5,
+H-DWB,Length,18,25,
+H-DWB,Length,22,39.5,
+H-DWB,Color,1,0,"""14, 18, 22"""
+H-DWB,Color,1B,0,"""14, 18, 22"""
+H-DWB,Color,2,0,"""14, 18, 22"""
+H-DWB,Color,27,3,"""14, 18, 22"""
+H-DWB,Color,30,3,"""14, 18, 22"""
+H-DWB,Color,350,3,"""14, 18"""
+H-DWB,Color,4,0,"""14, 18, 22"""
+H-DWB,Color,613,15,"""14, 18"""
+H-DWB,Color,F1B/27,3,"""14, 18, 22"""
+H-DWB,Color,F1B/30,3,"""14, 18, 22"""
+H-DWB,Color,F4/27,3,"""14, 18, 22"""
+H-DWB,Color,F4/30,3,"""14, 18, 22"""
